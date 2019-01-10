@@ -459,6 +459,24 @@ namespace NuGet.ProjectModel
             }
         }
 
+        private static void SetDownloadDependencies(IObjectWriter writer, IList<LibraryIdentity> downloadDependencies)
+        {
+            if (!downloadDependencies.Any())
+            {
+                return;
+            }
+
+            writer.WriteObjectStart("downloadDependencies");
+
+            foreach (var dependency in downloadDependencies.OrderBy(dep => dep))
+            {
+                writer.WriteObjectStart(dependency.Name);
+                SetValue(writer, "version", dependency.Version.ToNormalizedString());
+            }
+
+            writer.WriteObjectEnd();
+        }
+
         private static void SetFrameworks(IObjectWriter writer, IList<TargetFrameworkInformation> frameworks)
         {
             if (frameworks.Any())
@@ -474,6 +492,7 @@ namespace NuGet.ProjectModel
                     SetImports(writer, framework.Imports);
                     SetValueIfTrue(writer, "assetTargetFallback", framework.AssetTargetFallback);
                     SetValueIfTrue(writer, "warn", framework.Warn);
+                    SetDownloadDependencies(writer, framework.DownloadDependencies);
 
                     writer.WriteObjectEnd();
                 }

@@ -772,8 +772,14 @@ namespace NuGet.ProjectModel
                 Dependencies = new List<LibraryDependency>(),
                 Imports = importFrameworks,
                 Warn = GetWarnSetting(properties),
-                AssetTargetFallback = assetTargetFallback
+                AssetTargetFallback = assetTargetFallback,
+                DownloadDependencies = new List<LibraryIdentity>(),
             };
+
+            PopulateDownloadDependencies(
+                targetFrameworkInformation.DownloadDependencies,
+                properties,
+                packageSpec.FilePath);
 
             PopulateDependencies(
                 packageSpec.FilePath,
@@ -795,6 +801,64 @@ namespace NuGet.ProjectModel
             packageSpec.TargetFrameworks.Add(targetFrameworkInformation);
 
             return true;
+        }
+
+        private static void PopulateDownloadDependencies(IList<LibraryIdentity> downloadDependencies, JObject properties, string packageSpecPath)
+        {
+            var downloadDependenciesProperty = properties["downloadDependencies"] as JObject;
+            if (downloadDependenciesProperty != null)
+            {
+                foreach (var dependency in downloadDependenciesProperty)
+                {
+                    if (string.IsNullOrEmpty(dependency.Key) || dependency.Value.Type != JTokenType.Object)
+                    {
+                        throw FileFormatException.Create(
+                            "Unable to resolve downloadDependency ''.",
+                            dependency.Value,
+                            packageSpecPath);
+                    }
+
+                    var dependencyValue = dependency.Value;
+                    NuGetVersion version = null;
+                    string versionValue = null;
+
+                    var dependencyVersionToken = dependencyValue["version"];
+                    if (dependencyVersionToken != null
+                        && dependencyVersionToken.Type == JTokenType.String)
+                    {
+                        versionValue = dependencyVersionToken.Value<string>();
+                    }
+
+                    if (!string.IsNullOrEmpty(versionValue))
+                    {
+                        try
+                        {
+                            version = NuGetVersion.Parse(versionValue);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw FileFormatException.Create(
+                                ex,
+                                dependencyVersionToken,
+                                packageSpecPath);
+                        }
+                    }
+                    else
+                    {
+                        throw FileFormatException.Create(
+                                $"The version cannot be null or empty",
+                                dependencyVersionToken,
+                                packageSpecPath);
+                    }
+
+                    downloadDependencies.Add(new LibraryIdentity()
+                    {
+                        Name = dependency.Key,
+                        Version = version,
+                        Type = LibraryType.Package // The type is always assumed to be Package
+                    });
+                }
+            }
         }
 
         private static List<NuGetFramework> GetImports(JObject properties, PackageSpec packageSpec)

@@ -32,6 +32,11 @@ namespace NuGet.ProjectModel
         /// </summary>
         public bool Warn { get; set; }
 
+        /// <summary>
+        /// List of dependencies that are not part of the graph resolution. Duplicate IDs are allowed.
+        /// </summary>
+        public IList<LibraryIdentity> DownloadDependencies { get; set; } = new List<LibraryIdentity>();
+
         public override string ToString()
         {
             return FrameworkName.GetShortFolderName();
@@ -45,6 +50,7 @@ namespace NuGet.ProjectModel
             hashCode.AddObject(AssetTargetFallback);
             hashCode.AddSequence(Dependencies);
             hashCode.AddSequence(Imports);
+            hashCode.AddSequence(DownloadDependencies);
 
             return hashCode.CombinedHash;
         }
@@ -69,17 +75,19 @@ namespace NuGet.ProjectModel
             return EqualityUtility.EqualsWithNullCheck(FrameworkName, other.FrameworkName) &&
                    Dependencies.OrderedEquals(other.Dependencies, dependency => dependency.Name, StringComparer.OrdinalIgnoreCase) &&
                    Imports.SequenceEqualWithNullCheck(other.Imports) &&
-                   AssetTargetFallback == other.AssetTargetFallback;
+                   AssetTargetFallback == other.AssetTargetFallback &&
+                   DownloadDependencies.OrderedEquals(other.DownloadDependencies, dep => dep);
         }
 
         public TargetFrameworkInformation Clone()
         {
             var clonedObject = new TargetFrameworkInformation();
             clonedObject.FrameworkName = FrameworkName;
-            clonedObject.Dependencies = Dependencies.Select(item => (LibraryDependency)item.Clone()).ToList();
+            clonedObject.Dependencies = Dependencies.Select(item => item.Clone()).ToList();
             clonedObject.Imports = new List<NuGetFramework>(Imports);
             clonedObject.AssetTargetFallback = AssetTargetFallback;
             clonedObject.Warn = Warn;
+            clonedObject.DownloadDependencies = DownloadDependencies.Select(item => item.Clone()).ToList();
             return clonedObject;
         }
     }
