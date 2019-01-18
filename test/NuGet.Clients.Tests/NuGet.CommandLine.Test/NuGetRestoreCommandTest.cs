@@ -2310,10 +2310,8 @@ EndProject";
             }
         }
 
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public void RestoreCommand_HonorsSkipMSBuildFlag(bool skipMSBuild)
+        [Fact]
+        public void RestoreCommand_RestoresProjectReferencesIfPresent()
         {
             // Arrange
             var nugetexe = Util.GetNuGetExePath();
@@ -2332,23 +2330,15 @@ EndProject";
                 var r = CommandRunner.Run(
                     nugetexe,
                     workingPath,
-                    "restore -Source " + repositoryPath + (skipMSBuild ? " -SkipMSBuild" : ""),
+                    "restore -Source " + repositoryPath,
                     waitForExit: true);
 
                 Assert.True(_successCode == r.Item1, r.Item2 + " " + r.Item3);
                 var packageFileA = Path.Combine(workingPath, @"GlobalPackages", "packageA", "1.1.0", "packageA.1.1.0.nupkg");
                 var packageFileB = Path.Combine(workingPath, @"GlobalPackages", "packageB", "2.2.0", "packageB.2.2.0.nupkg");
                 var packageFileC = Path.Combine(workingPath, @"packages", "packageC.3.3.0", "packageC.3.3.0.nupkg");
-                if (skipMSBuild)
-                {
-                    Assert.False(File.Exists(packageFileA));
-                    Assert.False(File.Exists(packageFileB));
-                }
-                else
-                {
-                    Assert.True(File.Exists(packageFileA));
-                    Assert.True(File.Exists(packageFileB));
-                }
+                Assert.True(File.Exists(packageFileA));
+                Assert.True(File.Exists(packageFileB));
                 Assert.True(File.Exists(packageFileC));
             }
         }

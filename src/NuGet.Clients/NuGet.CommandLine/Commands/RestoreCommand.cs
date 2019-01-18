@@ -56,9 +56,6 @@ namespace NuGet.CommandLine
         [Option(typeof(NuGetCommand), "ForceRestoreCommand")]
         public bool Force { get; set; }
 
-        [Option(typeof(NuGetCommand), "RestoreCommandSkipMSBuild")]
-        public bool SkipMSBuild { get; set; }
-
         [ImportingConstructor]
         public RestoreCommand()
         {
@@ -503,19 +500,19 @@ namespace NuGet.CommandLine
 
                 try
                 {
-                    if (SkipMSBuild)
-                    {
-                        // We still need a (blank) DependencyGraphSpec or AddInputsFromDependencyGraphSpec below
-                        // won't run, and that does important processing on packageRestoreInputs even if there's
-                        // nothing in dgFileOutput.
-                        dgFileOutput = new DependencyGraphSpec();
-                    }
-                    else
+                    if (await RequiresDependencyGraphAsync(projectsWithPotentialP2PReferences))
                     {
                         dgFileOutput = await GetDependencyGraphSpecAsync(projectsWithPotentialP2PReferences,
                             GetSolutionDirectory(packageRestoreInputs),
                             packageRestoreInputs.NameOfSolutionFile,
                             ConfigFile);
+                    }
+                    else
+                    {
+                        // We still need a (blank) DependencyGraphSpec; otherwise, AddInputsFromDependencyGraphSpec below
+                        // won't run, and that does important processing on packageRestoreInputs even if there's
+                        // nothing in dgFileOutput.
+                        dgFileOutput = new DependencyGraphSpec();
                     }
                 }
                 catch (Exception ex)
@@ -557,6 +554,36 @@ namespace NuGet.CommandLine
                     AddInputsFromDependencyGraphSpec(packageRestoreInputs, dgFileOutput);
                 }
             }
+        }
+
+        private async Task<bool> RequiresDependencyGraphAsync(string[] projectsWithPotentialP2PReferences)
+        {
+            foreach (var project in projectsWithPotentialP2PReferences)
+            {
+                if (HasProjectJsonFile(project) || await FastCheckForPackageReferencesAsync(project))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // this is a quick check that may have false positives; that's okay, it just means we skip an optimization for the legacy case
+        private static async Task<bool> FastCheckForPackageReferencesAsync(string project)
+        {
+            using (var reader = new StreamReader(project))
+            {
+                string line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (line.Contains($"<{ProjectItems.PackageReference}"))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private void AddInputsFromDependencyGraphSpec(PackageRestoreInputs packageRestoreInputs, DependencyGraphSpec dgFileOutput)
